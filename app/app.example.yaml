@@ -1,0 +1,15 @@
+runtime: go
+api_version: go1
+
+handlers:
+- url: /unfollow/morning
+  script: _go_app
+  login: admin
+- url: /unfollow/night
+  script: _go_app
+  login: admin
+
+env_variables:
+  INSTAGRAM_USERNAME: ''
+  INSTAGRAM_PASSWORD: ''
+  GCLOUD_PROJECT_ID: ''

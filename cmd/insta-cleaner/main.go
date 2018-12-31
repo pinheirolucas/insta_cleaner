@@ -6,15 +6,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
-	"time"
 
 	firebase "firebase.google.com/go"
+	"github.com/ahmdrz/goinsta"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"gopkg.in/ahmdrz/goinsta.v2"
+
+	"github.com/pinheirolucas/insta_cleaner/cleaner"
+	"github.com/pinheirolucas/insta_cleaner/logger"
 )
 
 func main() {
@@ -75,27 +74,12 @@ func main() {
 		log.Fatalf("(*firebase.App).Firestore: %v \n", err)
 	}
 
-	users := insta.Account.Following()
-	for users.Next() {
-		for _, user := range users.Users {
-			_, err := firestore.Collection("whitelist").Doc(strconv.Itoa(int(user.ID))).Get(context.Background())
-			switch grpc.Code(err) {
-			case codes.OK:
-				log.Printf("ignoring username %s id %d in whitelist", user.Username, user.ID)
-				continue
-			case codes.NotFound:
-				// continue to unfollow user
-			default:
-				log.Fatalf("not able to Get doc ID: %d: %v \n", user.ID, err)
-			}
+	instagramService := cleaner.NewGoinstaInstagramService(insta)
+	whitelistService := cleaner.NewFirebaseWhitelistService(firestore)
+	l := logger.NewDefault()
+	service := cleaner.NewService(instagramService, whitelistService, l)
 
-			if err := user.Unfollow(); err != nil {
-				log.Fatalf("not able to unfollow %s id %d: %v \n", user.Username, user.ID, err)
-			}
-
-			log.Printf("user unfollowed: %s", user.Username)
-
-			time.Sleep(time.Duration(3 * time.Second))
-		}
+	if err := service.Clean(); err != nil {
+		log.Fatalf("(*cleaner.Service).Clean: %v \n", err)
 	}
 }

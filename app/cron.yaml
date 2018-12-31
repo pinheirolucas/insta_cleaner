@@ -1,0 +1,14 @@
+# cron:
+# - description: "morning unfollow batch job"
+#   url: /unfollow/morning
+#   schedule: every day 09:00
+#   timezone: America/Sao_Paulo
+# - description: "night unfollow batch job"
+#   url: /unfollow/night
+#   schedule: every day 22:00
+#   timezone: America/Sao_Paulo
+cron:
+- description: "morning unfollow batch job"
+  url: /unfollow/morning
+  schedule: every 1 mins
+  timezone: America/Sao_Paulo

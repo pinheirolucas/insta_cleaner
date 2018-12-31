@@ -15,3 +15,5 @@
 .insta-cleaner.toml
 sessions
 keys
+app.yaml
+app.yml
