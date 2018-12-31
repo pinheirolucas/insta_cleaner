@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
@@ -13,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/urlfetch"
 
 	"github.com/pinheirolucas/insta_cleaner/cleaner"
 	"github.com/pinheirolucas/insta_cleaner/logger"
@@ -29,6 +31,10 @@ func unfollow(w http.ResponseWriter, r *http.Request) {
 	username := os.Getenv("INSTAGRAM_USERNAME")
 	password := os.Getenv("INSTAGRAM_PASSWORD")
 	project := os.Getenv("GCLOUD_PROJECT_ID")
+	maxUnfollows, err := strconv.Atoi(os.Getenv("INSTA_CLEANER_MAX_UNFOLLOWS"))
+	if err != nil {
+		maxUnfollows = 10
+	}
 
 	ustr := fmt.Sprintf("%s@%s", username, password)
 	usha := sha1.New()
@@ -43,16 +49,23 @@ func unfollow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var insta *goinsta.Instagram
+	instaOptions := []goinsta.Option{
+		goinsta.WithHTTPClient(urlfetch.Client(ctx)),
+	}
 
 	if rc, err := object.NewReader(ctx); err == nil {
-		insta, err = goinsta.ImportReader(rc)
+		log.Infof(ctx, "using existing session: %s", session)
+
+		insta, err = goinsta.ImportReader(rc, instaOptions...)
 		if err != nil {
 			log.Errorf(ctx, "goinsta.ImportReader: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	} else if err == storage.ErrObjectNotExist {
-		insta = goinsta.New(username, password)
+		log.Infof(ctx, "creating new instagram session: %s", session)
+
+		insta = goinsta.New(username, password, instaOptions...)
 
 		if err := insta.Login(); err != nil {
 			log.Errorf(ctx, "(*goinsta.Instagram).Login: %v", err)
@@ -84,7 +97,7 @@ func unfollow(w http.ResponseWriter, r *http.Request) {
 	instagramService := cleaner.NewGoinstaInstagramService(insta)
 	whitelistService := cleaner.NewFirebaseWhitelistService(fcli)
 	l := logger.NewAppengine(ctx)
-	service := cleaner.NewService(instagramService, whitelistService, l)
+	service := cleaner.NewService(instagramService, whitelistService, l, cleaner.WithMaxUnfollows(uint32(maxUnfollows)))
 
 	if err := service.Clean(); err != nil {
 		log.Errorf(ctx, "(*cleaner.Service).Clean: %v", err)

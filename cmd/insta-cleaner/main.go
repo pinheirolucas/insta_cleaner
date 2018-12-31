@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 
 	firebase "firebase.google.com/go"
-	"github.com/ahmdrz/goinsta"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 
 	"github.com/pinheirolucas/insta_cleaner/cleaner"
+	"github.com/pinheirolucas/insta_cleaner/helper"
 	"github.com/pinheirolucas/insta_cleaner/logger"
 )
 
@@ -20,6 +20,7 @@ func main() {
 	var config string
 
 	flag.StringVar(&config, "config", "", "path to config file")
+	flag.Parse()
 
 	if config == "" {
 		viper.SetConfigName(".insta-cleaner")
@@ -43,25 +44,11 @@ func main() {
 	password := viper.GetString("password")
 	sessionsDir := viper.GetString("sessions_dir")
 	firebaseKeyFile := viper.GetString("firebase_admin_key_file")
-	sessionFile := filepath.Join(sessionsDir, "."+username)
+	session := filepath.Join(sessionsDir, "."+username)
 
-	var insta *goinsta.Instagram
-
-	if _, err := os.Stat(sessionFile); err == nil {
-		insta, err = goinsta.Import(sessionFile)
-		if err != nil {
-			log.Fatalf("goinsta.Import: %v \n", err)
-		}
-	} else {
-		insta = goinsta.New(username, password)
-
-		if err := insta.Login(); err != nil {
-			log.Fatalf("(*goinsta.Instagram).Login: %v \n", err)
-		}
-
-		if err := insta.Export(sessionFile); err != nil {
-			log.Fatalf("(*goinsta.Instagram).Export: %v \n", err)
-		}
+	insta, err := helper.InitLocalGoinsta(username, password, session)
+	if err != nil {
+		log.Fatalf("helper.InitLocalGoinsta: %v \n", err)
 	}
 
 	app, err := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile(firebaseKeyFile))

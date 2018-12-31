@@ -11,3 +11,10 @@ func WithCooldown(cooldown time.Duration) Option {
 		s.unfollowCooldown = cooldown
 	}
 }
+
+// WithMaxUnfollows ...
+func WithMaxUnfollows(max uint32) Option {
+	return func(s *Service) {
+		s.maxUnfollows = max
+	}
+}

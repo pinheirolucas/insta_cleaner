@@ -12,8 +12,10 @@ import (
 type Service struct {
 	l logger.Logger
 
-	instagramService InstagramService
 	unfollowCooldown time.Duration
+	maxUnfollows     uint32
+
+	instagramService InstagramService
 	whitelistService WhitelistService
 }
 
@@ -39,8 +41,14 @@ func NewService(instagramService InstagramService, whitelistService WhitelistSer
 // Clean ...
 func (s *Service) Clean() error {
 	users := s.instagramService.GetFollowingUsers()
+	var unfollows uint32
+
 	for users.Next() {
 		for _, user := range users.Users {
+			if s.maxUnfollows != 0 && unfollows == s.maxUnfollows {
+				return nil
+			}
+
 			isIn, err := s.whitelistService.IsIn(user.ID)
 			if err != nil {
 				return errors.Wrap(err, "(WhitelistService).IsIn")
@@ -57,9 +65,12 @@ func (s *Service) Clean() error {
 
 			s.l.Infof("unfollowed username %s id %d", user.Username, user.ID)
 
+			unfollows++
 			time.Sleep(s.unfollowCooldown)
 		}
 	}
+
+	s.l.Infof("job unfollowed %d user", unfollows)
 
 	return nil
 }
