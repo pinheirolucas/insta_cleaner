@@ -69,7 +69,7 @@ func main() {
 		log.Fatalf("firebase.NewApp: %v \n", err)
 	}
 
-	whitelistService, err := whitelist.NewService(viper.GetString("whitelist_service_type"), app)
+	whitelistService, err := whitelist.NewService(context.Background(), viper.GetString("whitelist_service_type"), app)
 	if err != nil {
 		log.Fatalf("whitelist.NewService: %v \n", err)
 	}

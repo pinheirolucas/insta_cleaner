@@ -8,8 +8,8 @@ import (
 	"os"
 	"strconv"
 
-	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
+	firebase "firebase.google.com/go"
 	"github.com/ahmdrz/goinsta"
 	"github.com/pkg/errors"
 	"google.golang.org/appengine"
@@ -18,6 +18,7 @@ import (
 
 	"github.com/pinheirolucas/insta_cleaner/cleaner"
 	"github.com/pinheirolucas/insta_cleaner/logger"
+	"github.com/pinheirolucas/insta_cleaner/whitelist"
 )
 
 func init() {
@@ -31,6 +32,8 @@ func unfollow(w http.ResponseWriter, r *http.Request) {
 	username := os.Getenv("INSTAGRAM_USERNAME")
 	password := os.Getenv("INSTAGRAM_PASSWORD")
 	project := os.Getenv("GCLOUD_PROJECT_ID")
+	databaseURL := os.Getenv("FIREBASE_REALTIME_DATABASE_URL")
+
 	maxUnfollows, err := strconv.Atoi(os.Getenv("INSTA_CLEANER_MAX_UNFOLLOWS"))
 	if err != nil {
 		maxUnfollows = 10
@@ -87,15 +90,21 @@ func unfollow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fcli, err := firestore.NewClient(ctx, project)
+	app, err := firebase.NewApp(ctx, &firebase.Config{
+		DatabaseURL: databaseURL,
+	})
 	if err != nil {
-		log.Errorf(ctx, "firestore.NewClient: %v", err)
+		log.Errorf(ctx, "firebase.NewApp: %v \n", err)
+	}
+
+	whitelistService, err := whitelist.NewService(ctx, os.Getenv("WHITELIST_SERVICE"), app)
+	if err != nil {
+		log.Errorf(ctx, "whitelist.NewService: %v \n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	instagramService := cleaner.NewGoinstaInstagramService(insta)
-	whitelistService := whitelist.NewFirestoreService(fcli)
 	l := logger.NewAppengine(ctx)
 	service := cleaner.NewService(instagramService, whitelistService, l, cleaner.WithMaxUnfollows(uint32(maxUnfollows)))
 

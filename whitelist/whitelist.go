@@ -19,17 +19,17 @@ type Service interface {
 }
 
 // NewService ...
-func NewService(serviceType string, app *firebase.App) (Service, error) {
+func NewService(ctx context.Context, serviceType string, app *firebase.App) (Service, error) {
 	switch serviceType {
 	case serviceTypeFirestore:
-		firestore, err := app.Firestore(context.Background())
+		firestore, err := app.Firestore(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "(*firebase.App).Firestore")
 		}
 
 		return NewFirestoreService(firestore), nil
 	case serviceTypeRealtimeDatabase:
-		database, err := app.Database(context.Background())
+		database, err := app.Database(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "(*firebase.App).Database")
 		}
