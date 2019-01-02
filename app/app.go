@@ -95,7 +95,7 @@ func unfollow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	instagramService := cleaner.NewGoinstaInstagramService(insta)
-	whitelistService := cleaner.NewFirebaseWhitelistService(fcli)
+	whitelistService := whitelist.NewFirestoreService(fcli)
 	l := logger.NewAppengine(ctx)
 	service := cleaner.NewService(instagramService, whitelistService, l, cleaner.WithMaxUnfollows(uint32(maxUnfollows)))
 

@@ -14,13 +14,20 @@ import (
 	"github.com/pinheirolucas/insta_cleaner/cleaner"
 	"github.com/pinheirolucas/insta_cleaner/helper"
 	"github.com/pinheirolucas/insta_cleaner/logger"
+	"github.com/pinheirolucas/insta_cleaner/whitelist"
 )
 
 func main() {
 	var config string
+	var limit int
 
+	flag.IntVar(&limit, "limit", 10, "limit of unfollows")
 	flag.StringVar(&config, "config", "", "path to config file")
 	flag.Parse()
+
+	if limit < 0 {
+		log.Fatal("limit must bem greater than 0")
+	}
 
 	if config == "" {
 		viper.SetConfigName(".insta-cleaner")
@@ -44,6 +51,8 @@ func main() {
 	password := viper.GetString("password")
 	sessionsDir := viper.GetString("sessions_dir")
 	firebaseKeyFile := viper.GetString("firebase_admin_key_file")
+	databaseURL := viper.GetString("realtime_database_url")
+
 	session := filepath.Join(sessionsDir, "."+username)
 
 	insta, err := helper.InitLocalGoinsta(username, password, session)
@@ -51,20 +60,25 @@ func main() {
 		log.Fatalf("helper.InitLocalGoinsta: %v \n", err)
 	}
 
-	app, err := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile(firebaseKeyFile))
+	app, err := firebase.NewApp(
+		context.Background(),
+		&firebase.Config{
+			DatabaseURL: databaseURL,
+		},
+		option.WithCredentialsFile(firebaseKeyFile),
+	)
 	if err != nil {
 		log.Fatalf("firebase.NewApp: %v \n", err)
 	}
 
-	firestore, err := app.Firestore(context.Background())
+	whitelistService, err := whitelist.NewService(viper.GetString("whitelist_service_type"), app)
 	if err != nil {
-		log.Fatalf("(*firebase.App).Firestore: %v \n", err)
+		log.Fatalf("whitelist.NewService: %v \n", err)
 	}
 
 	instagramService := cleaner.NewGoinstaInstagramService(insta)
-	whitelistService := cleaner.NewFirebaseWhitelistService(firestore)
 	l := logger.NewDefault()
-	service := cleaner.NewService(instagramService, whitelistService, l)
+	service := cleaner.NewService(instagramService, whitelistService, l, cleaner.WithMaxUnfollows(uint32(limit)))
 
 	if err := service.Clean(); err != nil {
 		log.Fatalf("(*cleaner.Service).Clean: %v \n", err)

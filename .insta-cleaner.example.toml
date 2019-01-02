@@ -1,4 +1,6 @@
 username = ""
 password = ""
 sessions_dir = ""
+# firestore or realtime
+whitelist_service_type = ""
 firebase_admin_key_file = ""

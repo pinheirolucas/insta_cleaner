@@ -7,25 +7,23 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	firebase "firebase.google.com/go"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 
 	"github.com/pinheirolucas/insta_cleaner/helper"
+	"github.com/pinheirolucas/insta_cleaner/whitelist"
 )
 
 func main() {
-	var config, whitelist string
+	var config, wl string
 
 	flag.StringVar(&config, "config", "", "path to config file")
-	flag.StringVar(&whitelist, "whitelist", "", "path to whitelist txt file")
+	flag.StringVar(&wl, "whitelist", "", "path to whitelist txt file")
 	flag.Parse()
 
-	if whitelist == "" {
+	if wl == "" {
 		log.Fatal("no whitelist file")
 	}
 
@@ -51,6 +49,8 @@ func main() {
 	password := viper.GetString("password")
 	sessionsDir := viper.GetString("sessions_dir")
 	credentials := viper.GetString("firebase_admin_key_file")
+	databaseURL := viper.GetString("realtime_database_url")
+
 	session := filepath.Join(sessionsDir, "."+username)
 
 	insta, err := helper.InitLocalGoinsta(username, password, session)
@@ -58,17 +58,23 @@ func main() {
 		log.Fatalf("helper.InitLocalGoinsta: %v \n", err)
 	}
 
-	app, err := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile(credentials))
+	app, err := firebase.NewApp(
+		context.Background(),
+		&firebase.Config{
+			DatabaseURL: databaseURL,
+		},
+		option.WithCredentialsFile(credentials),
+	)
 	if err != nil {
 		log.Fatalf("firebase.NewApp: %v \n", err)
 	}
 
-	firestore, err := app.Firestore(context.Background())
+	whitelistService, err := whitelist.NewService(viper.GetString("whitelist_service_type"), app)
 	if err != nil {
-		log.Fatalf("(*firebase.App).Firestore: %v \n", err)
+		log.Fatalf("whitelist.NewService: %v \n", err)
 	}
 
-	file, err := os.Open(whitelist)
+	file, err := os.Open(wl)
 	if err != nil {
 		log.Fatalf("os.Open: %v \n", err)
 	}
@@ -78,29 +84,15 @@ func main() {
 	for scanner.Scan() {
 		u := scanner.Text()
 
+		log.Printf("importing %s \n", u)
+
 		user, err := insta.Profiles.ByName(u)
 		if err != nil {
 			log.Fatalf("(*goinsta.Instagram).Profiles.ByName: %v \n", err)
 		}
 
-		snap, err := firestore.Collection("whitelist").Doc(strconv.Itoa(int(user.ID))).Get(context.Background())
-		switch grpc.Code(err) {
-		case codes.OK:
-			if snap.Exists() {
-				continue
-			}
-		case codes.NotFound:
-			// proceed do create
-		default:
-			log.Fatalf("not able to get %s:%d", user.Username, user.ID)
-		}
-
-		_, err = snap.Ref.Create(context.Background(), map[string]interface{}{
-			"id":       user.ID,
-			"username": user.Username,
-		})
-		if err != nil {
-			log.Fatalf("snap.Ref.Create: %v \n", err)
+		if err := whitelistService.CreateIfNotExists(user.ID, user.Username); err != nil {
+			log.Fatalf("(cleaner.WhitelistService).CreateIfNotExists: %v \n", err)
 		}
 	}
 }

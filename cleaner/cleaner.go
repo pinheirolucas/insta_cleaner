@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/pinheirolucas/insta_cleaner/logger"
+	"github.com/pinheirolucas/insta_cleaner/whitelist"
 )
 
 // Service ...
@@ -16,11 +17,11 @@ type Service struct {
 	maxUnfollows     uint32
 
 	instagramService InstagramService
-	whitelistService WhitelistService
+	whitelistService whitelist.Service
 }
 
 // NewService ...
-func NewService(instagramService InstagramService, whitelistService WhitelistService, l logger.Logger, options ...Option) *Service {
+func NewService(instagramService InstagramService, whitelistService whitelist.Service, l logger.Logger, options ...Option) *Service {
 	s := &Service{
 		l:                l,
 		instagramService: instagramService,
@@ -43,12 +44,9 @@ func (s *Service) Clean() error {
 	users := s.instagramService.GetFollowingUsers()
 	var unfollows uint32
 
+ITERATOR:
 	for users.Next() {
 		for _, user := range users.Users {
-			if s.maxUnfollows != 0 && unfollows == s.maxUnfollows {
-				return nil
-			}
-
 			isIn, err := s.whitelistService.IsIn(user.ID)
 			if err != nil {
 				return errors.Wrap(err, "(WhitelistService).IsIn")
@@ -66,6 +64,11 @@ func (s *Service) Clean() error {
 			s.l.Infof("unfollowed username %s id %d", user.Username, user.ID)
 
 			unfollows++
+
+			if s.maxUnfollows != 0 && unfollows == s.maxUnfollows {
+				break ITERATOR
+			}
+
 			time.Sleep(s.unfollowCooldown)
 		}
 	}
