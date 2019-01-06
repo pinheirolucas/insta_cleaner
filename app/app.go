@@ -22,8 +22,7 @@ import (
 )
 
 func init() {
-	http.HandleFunc("/unfollow/morning", unfollow)
-	http.HandleFunc("/unfollow/night", unfollow)
+	http.HandleFunc("/tasks/unfollow", unfollow)
 }
 
 func unfollow(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +30,7 @@ func unfollow(w http.ResponseWriter, r *http.Request) {
 
 	username := os.Getenv("INSTAGRAM_USERNAME")
 	password := os.Getenv("INSTAGRAM_PASSWORD")
-	project := os.Getenv("GCLOUD_PROJECT_ID")
+	bucket := os.Getenv("FIREBASE_STORAGE_BUCKET")
 	databaseURL := os.Getenv("FIREBASE_REALTIME_DATABASE_URL")
 
 	maxUnfollows, err := strconv.Atoi(os.Getenv("INSTA_CLEANER_MAX_UNFOLLOWS"))
@@ -44,7 +43,15 @@ func unfollow(w http.ResponseWriter, r *http.Request) {
 	usha.Write([]byte(ustr))
 	session := fmt.Sprintf("%x", usha.Sum(nil))
 
-	object, err := getSession(ctx, project, session)
+	app, err := firebase.NewApp(ctx, &firebase.Config{
+		DatabaseURL:   databaseURL,
+		StorageBucket: bucket,
+	})
+	if err != nil {
+		log.Errorf(ctx, "firebase.NewApp: %v \n", err)
+	}
+
+	object, err := getSession(ctx, app, session)
 	if err != nil {
 		log.Errorf(ctx, "getSession: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -90,13 +97,6 @@ func unfollow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app, err := firebase.NewApp(ctx, &firebase.Config{
-		DatabaseURL: databaseURL,
-	})
-	if err != nil {
-		log.Errorf(ctx, "firebase.NewApp: %v \n", err)
-	}
-
 	whitelistService, err := whitelist.NewService(ctx, os.Getenv("WHITELIST_SERVICE"), app)
 	if err != nil {
 		log.Errorf(ctx, "whitelist.NewService: %v \n", err)
@@ -115,11 +115,16 @@ func unfollow(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getSession(ctx context.Context, bucket, store string) (*storage.ObjectHandle, error) {
-	scli, err := storage.NewClient(ctx)
+func getSession(ctx context.Context, app *firebase.App, store string) (*storage.ObjectHandle, error) {
+	scli, err := app.Storage(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "storage.NewClient")
+		return nil, errors.Wrap(err, "(*firebase.App).Storage")
 	}
 
-	return scli.Bucket(bucket).Object(store), nil
+	bucket, err := scli.DefaultBucket()
+	if err != nil {
+		return nil, errors.Wrap(err, "(*storage.Client).DefaultBucket")
+	}
+
+	return bucket.Object(store), nil
 }
