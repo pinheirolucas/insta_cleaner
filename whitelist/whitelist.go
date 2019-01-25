@@ -3,7 +3,7 @@ package whitelist
 import (
 	"context"
 
-	"firebase.google.com/go"
+	firebase "firebase.google.com/go"
 	"github.com/pkg/errors"
 )
 
@@ -16,6 +16,7 @@ const (
 type Service interface {
 	IsIn(id int64) (bool, error)
 	CreateIfNotExists(id int64, username string) error
+	Delete(id int64) error
 }
 
 // NewService ...

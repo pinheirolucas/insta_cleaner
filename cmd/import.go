@@ -1,14 +1,13 @@
-package main
+package cmd
 
 import (
 	"bufio"
 	"context"
-	"flag"
 	"log"
 	"os"
-	"path/filepath"
 
 	firebase "firebase.google.com/go"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 
@@ -16,44 +15,30 @@ import (
 	"github.com/pinheirolucas/insta_cleaner/whitelist"
 )
 
-func main() {
-	var config, wl string
+// importCmd represents the import command
+var importCmd = &cobra.Command{
+	Use:   "import",
+	Short: "Add the users to database from a whitelist",
+	Run:   runImport,
+}
 
-	flag.StringVar(&config, "config", "", "path to config file")
-	flag.StringVar(&wl, "whitelist", "", "path to whitelist txt file")
-	flag.Parse()
+func init() {
+	whitelistCmd.AddCommand(importCmd)
+}
 
-	if wl == "" {
-		log.Fatal("no whitelist file")
+func runImport(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		createError("no whitelist file")
 	}
 
-	if config == "" {
-		viper.SetConfigName(".insta-cleaner")
-		viper.AddConfigPath(".")
+	wl := args[0]
 
-		if err := viper.ReadInConfig(); err != nil {
-			log.Fatalf("viper.ReadInConfig: %v \n", err)
-		}
-	} else {
-		file, err := os.Open(config)
-		if err != nil {
-			log.Fatalf("os.Open: %v \n", err)
-		}
-
-		if err := viper.ReadConfig(file); err != nil {
-			log.Fatalf("viper.ReadConfig: %v \n", err)
-		}
+	c, err := loadConfig()
+	if err != nil {
+		handleError(err)
 	}
 
-	username := viper.GetString("username")
-	password := viper.GetString("password")
-	sessionsDir := viper.GetString("sessions_dir")
-	credentials := viper.GetString("firebase_admin_key_file")
-	databaseURL := viper.GetString("realtime_database_url")
-
-	session := filepath.Join(sessionsDir, "."+username)
-
-	insta, err := helper.InitLocalGoinsta(username, password, session)
+	insta, err := helper.InitLocalGoinsta(c.username, c.password, c.session)
 	if err != nil {
 		log.Fatalf("helper.InitLocalGoinsta: %v \n", err)
 	}
@@ -61,9 +46,9 @@ func main() {
 	app, err := firebase.NewApp(
 		context.Background(),
 		&firebase.Config{
-			DatabaseURL: databaseURL,
+			DatabaseURL: c.databaseURL,
 		},
-		option.WithCredentialsFile(credentials),
+		option.WithCredentialsFile(c.credentials),
 	)
 	if err != nil {
 		log.Fatalf("firebase.NewApp: %v \n", err)
