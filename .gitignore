@@ -12,7 +12,7 @@
 *.out
 
 # Project
-.insta-cleaner.toml
+.icleaner.toml
 sessions
 keys
 app.yaml

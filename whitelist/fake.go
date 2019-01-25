@@ -4,13 +4,15 @@ package whitelist
 type FakeService struct {
 	isInFunc              func() (bool, error)
 	createIfNotExistsFunc func() error
+	deleteFunc            func() error
 }
 
 // NewFakeService ...
-func NewFakeService(isInFunc func() (bool, error), createIfNotExistsFunc func() error) *FakeService {
+func NewFakeService(isInFunc func() (bool, error), createIfNotExistsFunc func() error, deleteFunc func() error) *FakeService {
 	return &FakeService{
 		isInFunc:              isInFunc,
 		createIfNotExistsFunc: createIfNotExistsFunc,
+		deleteFunc:            deleteFunc,
 	}
 }
 
@@ -22,4 +24,9 @@ func (s *FakeService) IsIn(id int64) (bool, error) {
 // CreateIfNotExists ...
 func (s *FakeService) CreateIfNotExists(id int64, username string) error {
 	return s.createIfNotExistsFunc()
+}
+
+// Delete ...
+func (s *FakeService) Delete(id int64) error {
+	return s.deleteFunc()
 }

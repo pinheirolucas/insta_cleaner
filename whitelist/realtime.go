@@ -45,6 +45,17 @@ func (s *RealtimeDatabaseService) CreateIfNotExists(id int64, username string) e
 	return nil
 }
 
+// Delete ...
+func (s *RealtimeDatabaseService) Delete(id int64) error {
+	path := fmt.Sprintf("whitelist/%d", id)
+
+	if err := s.client.NewRef(path).Delete(context.Background()); err != nil {
+		return errors.Wrapf(err, "not able to delete path %s with id %d", path, id)
+	}
+
+	return nil
+}
+
 type whitelistMember struct {
 	ID       int64  `json:"id,omitempty"`
 	Username string `json:"username,omitempty"`

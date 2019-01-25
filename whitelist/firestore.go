@@ -59,3 +59,13 @@ func (s *FirestoreService) CreateIfNotExists(id int64, username string) error {
 
 	return nil
 }
+
+// Delete ...
+func (s *FirestoreService) Delete(id int64) error {
+	_, err := s.client.Collection("whitelist").Doc(strconv.Itoa(int(id))).Delete(context.Background())
+	if err != nil {
+		return errors.Wrapf(err, "not able to delete: %d", id)
+	}
+
+	return nil
+}
