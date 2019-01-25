@@ -5,13 +5,14 @@ import (
 	"log"
 
 	firebase "firebase.google.com/go"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"google.golang.org/api/option"
+
 	"github.com/pinheirolucas/insta_cleaner/cleaner"
 	"github.com/pinheirolucas/insta_cleaner/helper"
 	"github.com/pinheirolucas/insta_cleaner/logger"
 	"github.com/pinheirolucas/insta_cleaner/whitelist"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"google.golang.org/api/option"
 )
 
 var limit uint32
